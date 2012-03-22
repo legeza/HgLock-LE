@@ -1,0 +1,108 @@
+# Copyright 2012 Vladimir Legeza <vladimir.legeza@gmail.com>
+#
+# This software may be used and distributed according to the terms
+# of the GNU General Public License, incorporated herein by reference.
+
+
+HgLock-LE - is the extension for SCM Mercurial that allow users to
+          inform each other in case of parallel file modification
+          in one local repository.
+
+
+REASONS:
+        LE in ext. name means "Local (Extension)". "Local" because
+        we have anothe project with the similar name that store locks on a
+        remote server.
+
+          https://bitbucket.org/aragost/hglock
+
+        "Extension" because originally, functionality of this extension 
+        was implemented as a bash script in late 2008 that still available at
+        
+          https://github.com/legeza/HgLock
+
+        Current version was born in early 2012 during the during the 
+        process of learning python programming.
+
+        Some times developers, especially web developers, perform code
+        modification directly in place where this code is working. And
+        usually they like to do it much more then get their own copy from
+        repo, edit, put changes back and update working instance. And this
+        extension was developed especially for these guys.
+
+        Another example of extension usage is that sume you are a SysAdmin and
+        you didn't got enought servers to deploy and use such systems like
+        'cfengine' and 'puppet' but you'd like to supervise you configuration
+        files in the same strong way without making large amount of garbled 
+        files like:
+
+           cf.conf
+           cf.conf.bak
+           cf.conf.old
+
+         .. and so on ..
+
+        Dozens or even hundreds of such files can be replaced my one SCM which
+        will trace all changes and versions (especially when change 
+        related to several files).
+
+        HgLock-LE - is the tool that will help you to not to loose your changes 
+        in case of some one else is able to edit the same bunch of files in the same
+        time (and hence avoid possible service downtime).
+
+INSTALL:
+        To enable extension you need to add following line into "extension"
+        section of preferred hgrc file:
+
+          [extensions]
+          hglock = /path/to/hglock.py
+
+        Also, if you would like to send email notifications about 
+        breaking locks you need to configure "email" section. As minimal
+        configuration you may use these two lines:
+
+          [email]
+          method = /usr/sbin/sendmail
+
+        and set environment 'EMAIL' variable. (Should be compatible with
+        RFC 2822) Example:
+        
+          $ EMAIL="Vladimir Legeza <vladimir.legeza@gmail.com>"
+          $ export EMAIL
+
+        it will use sendmail to inform your colleague in case you break
+        his or her locks (use -f option to do so). Also possible to send
+        emails directly to server over SMTP. See additional information
+        about this in Mercurial documentation.
+
+USAGE:
+  Set lock:
+        $ hg lock [-v] <file ...>
+
+              If no file specified, the list of already locked files and
+              lock owners will displayed.
+
+        -v    Will display a bit more information then usual.
+
+  Release Lock:
+        $ hg unlock [-f] [-v] <file ...>
+              
+              If no file specified, unlock would try to relaes all availble
+              locks.
+
+        -f    Force unlock. Allows you to break others locks. Owner will
+              be notified about this.
+
+        -v    Will display a bit more information then usual.
+  
+  HOOKS:
+        HgLock-LE performs some sort of automation:
+        When you add a file to repository, it will be locked automaticaly.
+        and after commit locked files will be automaticaly released.
+
+        If you prefer to do all the tasks manually, just comment out
+        these tree lines in hglock.py file (on the buttom).
+
+            def uisetup(ui):
+              ui.setconfig("hooks", "post-add.hglock", lock)
+              ui.setconfig("hooks", "pre-commit.hglock", unlock)
