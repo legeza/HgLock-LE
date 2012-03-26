@@ -93,10 +93,18 @@ def lock(ui, repo, *pats, **opts):
   # Identify whether function is called as a hook,
   # and if so, change the command and reexecute it.
   if 'hooktype' in opts:
-	cmdline = list()
-	cmdline = opts['args'].split()
-	cmdline[0] = 'lock'
-	return(dispatch.dispatch(cmdline))
+    if opts['result'] == 0:
+      print opts
+      cmdline = list()
+      cmdline = opts['args'].split()
+      cmdline[0] = 'lock'
+	  # remove dir names and symlinks
+      for file in cmdline[::-1]:
+        if os.path.isdir(file) or os.path.islink(file):
+          cmdline.remove(file)
+      return(dispatch.dispatch(cmdline))
+    else:
+      return(opts['result'])
 
   # Calculate file path in repository
   filesList=list()
