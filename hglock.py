@@ -13,9 +13,11 @@ import os
 import re
 from mercurial import hg
 from mercurial import cmdutil
+from mercurial import commands
 from mercurial import util
 from mercurial import i18n
 from mercurial import store
+from mercurial import dispatch
 
 import datetime
 # Dict fields id's mapping:
@@ -58,6 +60,18 @@ def StoreData(lockFile, lockedFilesList):
 
 
 
+def PathInRepo(root, unit):
+  if root[-1] != pathSep:
+    root += pathSep
+  m = re.match(root + "(.+)",os.path.abspath(unit))
+  if m is None:
+    raise util.Abort(i18n._("file %s isn't match to repository (use -v for more details)" % unit))
+  else:
+    return m.groups()[0]
+
+
+
+
 def lock(ui, repo, *pats, **opts):
   """
   HGLock-LE is the extansion implements file locking funcionality that is vary similar to rcs(1).
@@ -67,6 +81,8 @@ def lock(ui, repo, *pats, **opts):
                If no file specified, the list of already locked files and
                lock owners will displayed.
          -v    Will display a bit more information then usual.
+
+		  Other options are available only for hook execution handling.
   """
   lockFile = repo.root + pathSep + ".hg" + pathSep + "locked.files"
   user = ui.username()
@@ -75,21 +91,20 @@ def lock(ui, repo, *pats, **opts):
   ui.note("user name: %s\n\n" % user)
 
   # Identify whether function is called as a hook,
-  # and if so, get the list of files to be proceed.
+  # and if so, change the command and reexecute it.
   if 'hooktype' in opts:
-    pats = opts['args'].split()
-    # Remove commands and options
-    for unit in pats[::-1]:
-      if unit not in repo.dirstate:
-	    pats.remove(unit)
+	cmdline = list()
+	cmdline = opts['args'].split()
+	cmdline[0] = 'lock'
+	return(dispatch.dispatch(cmdline))
 
   # Calculate file path in repository
   filesList=list()
   err=0
   for file in pats:
-    m = re.match(repo.root + pathSep + "(.+)",os.path.abspath(os.getcwd() + pathSep + file))
-    if m.groups()[0] in repo.dirstate:
-      filesList.append(m.groups()[0])
+    file = PathInRepo(repo.root, file)
+    if file in repo.dirstate:
+      filesList.append(file)
     else:
       ui.warn("%s\n" % (file))
       err += 1
@@ -147,30 +162,36 @@ def unlock(ui, repo, *pats, **opts):
           -f    Force unlock. Allows you to break others locks. Owner will
                 be notified about this.
           -v    Will display a bit more information then usual.
+
+		  Other options are available only for hook execution handling.
   """
   lockFile = repo.root + pathSep + ".hg" + pathSep + "locked.files"
   user = ui.username()
   ui.note("repository: %s\n" % repo.root)
   ui.note("lockfile: %s\n" % lockFile)
   ui.note("user name: %s\n\n" % user)
+  filesList=list()
 
   # Identify whether function is called as a hook,
-  # and if so, get the list of files to be proceed.
+  # and if so, change the command and reexecutei it.
   if 'hooktype' in opts:
-    pats = opts['args'].split()
-    # Remove commands and options
-    for unit in pats[::-1]:
-      if unit not in repo.dirstate:
-	    pats.remove(unit)
+	cmdline = list()
+	cmdline = opts['args'].split()
+	cmdline[0] = 'unlock'
+	return(dispatch.dispatch(cmdline))
+
+  #Calculate file path in repository
+  if not pats:
+    for file in pats:
+      filesList.append(PathInRepo(repo.root, file))
 
   # If files are not specified
   # and functil was called as a hook
   if not pats and 'hooktype' in opts:
     # States : modified, added, removed, deleted, unknown, ignored, clean"
     # Get files related to the first four statuses.
-    pats = list()
     for status in repo.status()[:4]:
-      pats += status
+      filesList += status
 
   # Load stored locking data
   lockedFilesList = LoadData(lockFile)
@@ -178,13 +199,8 @@ def unlock(ui, repo, *pats, **opts):
   # If files are not specified
   # try to release all available locks
   if not pats and 'hooktype' not in opts:
-   pats = lockedFilesList.keys()
+    filesList = lockedFilesList.keys()
 
-  #Calculate file path in repository
-  filesList=list()
-  for file in pats:
-    m = re.match(repo.root + pathSep + "(.+)",os.path.abspath(os.getcwd() + pathSep + file))
-    filesList.append(m.groups()[0])
 
   err = 0 
   for file in filesList:
@@ -220,11 +236,12 @@ def unlock(ui, repo, *pats, **opts):
     
 # COMMANDS
 cmdtable = {
-  "lock": (lock, [], "[-v] file..."),
+  "lock": (lock, [] + commands.walkopts + commands.dryrunopts, "[-v] file..."),
   "unlock": (unlock, [
        ('f', 'force', None, "Unlock even you are not owner."),
-       ], "[-v] [-f] file..."),
+       ] + commands.walkopts + commands.commitopts + commands.commitopts2, "[-v] [-f] file..."),
 }
+
 
 # HOOKS
 def uisetup(ui):
