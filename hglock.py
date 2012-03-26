@@ -175,30 +175,27 @@ def unlock(ui, repo, *pats, **opts):
   # Identify whether function is called as a hook,
   # and if so, change the command and reexecutei it.
   if 'hooktype' in opts:
-	cmdline = list()
-	cmdline = opts['args'].split()
-	cmdline[0] = 'unlock'
-	return(dispatch.dispatch(cmdline))
-
-  #Calculate file path in repository
-  if not pats:
-    for file in pats:
-      filesList.append(PathInRepo(repo.root, file))
-
-  # If files are not specified
-  # and functil was called as a hook
-  if not pats and 'hooktype' in opts:
-    # States : modified, added, removed, deleted, unknown, ignored, clean"
-    # Get files related to the first four statuses.
+    cmdline = list()
+    cmdline = opts['args'].split()
+    cmdline[0] = 'unlock'
     for status in repo.status()[:4]:
       filesList += status
+      for file in filesList:
+        if file not in cmdline:
+         cmdline.append(file)
+    return(dispatch.dispatch(cmdline))
+
+  #Calculate file path in repository
+  if pats:
+    for file in pats:
+      filesList.append(PathInRepo(repo.root, file))
 
   # Load stored locking data
   lockedFilesList = LoadData(lockFile)
 
   # If files are not specified
   # try to release all available locks
-  if not pats and 'hooktype' not in opts:
+  if not pats:
     filesList = lockedFilesList.keys()
 
 
