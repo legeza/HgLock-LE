@@ -1,7 +1,7 @@
 # HgLock-LE
 # hglock.py - file locking mechanizm for Mercurial
 #
-# Version 0.1
+# Version 0.2
 #
 # Copyright 2012 Vladimir Legeza <vladimir.legeza@gmail.com>
 #
@@ -18,6 +18,7 @@ from mercurial import util
 from mercurial import i18n
 from mercurial import store
 from mercurial import dispatch
+from mercurial import version
 
 import datetime
 # Dict fields id's mapping:
@@ -43,7 +44,7 @@ def LoadData(lockFile):
       file = decodefilename(file)
       lockedFilesList[file] = (user,date)
   return lockedFilesList
- 
+
 
 
 
@@ -82,7 +83,7 @@ def lock(ui, repo, *pats, **opts):
                lock owners will displayed.
          -v    Will display a bit more information then usual.
 
-		  Other options are available only for hook execution handling.
+          Other options are available only for hook execution handling.
   """
   lockFile = repo.root + pathSep + ".hg" + pathSep + "locked.files"
   user = ui.username()
@@ -94,15 +95,17 @@ def lock(ui, repo, *pats, **opts):
   # and if so, change the command and reexecute it.
   if 'hooktype' in opts:
     if opts['result'] == 0:
-      print opts
       cmdline = list()
       cmdline = opts['args'].split()
       cmdline[0] = 'lock'
-	  # remove dir names and symlinks
+      # remove dir names and symlinks
       for file in cmdline[::-1]:
         if os.path.isdir(file) or os.path.islink(file):
           cmdline.remove(file)
-      return(dispatch.dispatch(cmdline))
+      if version.get_version() < '1.9':
+        return(dispatch.dispatch(cmdline))
+      else:
+        return(dispatch.dispatch(dispatch.request(cmdline)))
     else:
       return(opts['result'])
 
@@ -160,7 +163,7 @@ def lock(ui, repo, *pats, **opts):
 
 
 
-  
+
 def unlock(ui, repo, *pats, **opts):
   """
   Release Lock:
@@ -171,7 +174,7 @@ def unlock(ui, repo, *pats, **opts):
                 be notified about this.
           -v    Will display a bit more information then usual.
 
-		  Other options are available only for hook execution handling.
+          Other options are available only for hook execution handling.
   """
   lockFile = repo.root + pathSep + ".hg" + pathSep + "locked.files"
   user = ui.username()
@@ -191,12 +194,19 @@ def unlock(ui, repo, *pats, **opts):
       for file in filesList:
         if file not in cmdline:
          cmdline.append(file)
-    return(dispatch.dispatch(cmdline))
+    if version.get_version() < '1.9':
+      return(dispatch.dispatch(cmdline))
+    else:
+      return(dispatch.dispatch(dispatch.request(cmdline)))
 
   #Calculate file path in repository
   if pats:
     for file in pats:
-      filesList.append(PathInRepo(repo.root, file))
+      if not os.path.exists(file): # file defined as path in repo (via hook call)
+        if file in repo.dirstate:
+          filesList.append(file)
+      else:
+        filesList.append(PathInRepo(repo.root, file))
 
   # Load stored locking data
   lockedFilesList = LoadData(lockFile)
@@ -209,10 +219,11 @@ def unlock(ui, repo, *pats, **opts):
 
   err = 0 
   for file in filesList:
+    ui.note("checking: %s\n" % file) 
     if file in lockedFilesList:
       # UnLock
       if not lockedFilesList[file][UserName] == user:
-	    # Force unlock and send email to lock owner
+      # Force unlock and send email to lock owner
         if opts['force']:
           # Email format: RFC 2822
           # example: "Vladimir Legeza <vladimir.legeza@gmail.com>"
@@ -220,7 +231,7 @@ def unlock(ui, repo, *pats, **opts):
           sendFrom = util.email(user)
           sendTo = [util.email(lockedFilesList[file][UserName])]
           message = "The lock you have set on '%s' file was removed by %s." % \
-		   (file, lockedFilesList[file][UserName])
+           (file, lockedFilesList[file][UserName])
           ui.note("sending email to: %s\n" % sendTo)
           mail.sendmail(ui, sendFrom, sendTo, message)
           ui.note("unlocking: %s\n" % file)
@@ -238,7 +249,7 @@ def unlock(ui, repo, *pats, **opts):
   StoreData(lockFile, lockedFilesList)
 
 
-    
+
 # COMMANDS
 cmdtable = {
   "lock": (lock, [] + commands.walkopts + commands.dryrunopts, "[-v] file..."),

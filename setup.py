@@ -4,7 +4,7 @@ from distutils.core import setup
 
 setup(
   name='hglock-le',
-  version='0.1',
+  version='0.2',
   description='File locking mechanizm for Mercurial',
   author='Vladimir Legeza',
   author_email='vladimir.legeza@gmail.com',
