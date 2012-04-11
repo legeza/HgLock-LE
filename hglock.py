@@ -18,7 +18,6 @@ from mercurial import util
 from mercurial import i18n
 from mercurial import store
 from mercurial import dispatch
-from mercurial import version
 
 import datetime
 # Dict fields id's mapping:
@@ -102,10 +101,11 @@ def lock(ui, repo, *pats, **opts):
       for file in cmdline[::-1]:
         if os.path.isdir(file) or os.path.islink(file):
           cmdline.remove(file)
-      if version.get_version() < '1.9':
-        return(dispatch.dispatch(cmdline))
-      else:
+      # Fixing problems around changed dispatcher (since v1.9)
+      if hasattr(dispatch, 'request'):
         return(dispatch.dispatch(dispatch.request(cmdline)))
+      else:
+        return(dispatch.dispatch(cmdline))
     else:
       return(opts['result'])
 
@@ -194,10 +194,11 @@ def unlock(ui, repo, *pats, **opts):
       for file in filesList:
         if file not in cmdline:
          cmdline.append(file)
-    if version.get_version() < '1.9':
-      return(dispatch.dispatch(cmdline))
-    else:
+    # Fixing problems around changed dispatcher (since v1.9)
+    if hasattr(dispatch, 'request'):
       return(dispatch.dispatch(dispatch.request(cmdline)))
+    else:
+      return(dispatch.dispatch(cmdline))
 
   #Calculate file path in repository
   if pats:
