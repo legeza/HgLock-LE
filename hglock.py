@@ -189,11 +189,6 @@ def unlock(ui, repo, *pats, **opts):
     cmdline = list()
     cmdline = opts['args'].split()
     cmdline[0] = 'unlock'
-    for status in repo.status()[:4]:
-      filesList += status
-      for file in filesList:
-        if file not in cmdline:
-         cmdline.append(file)
     # Fixing problems around changed dispatcher (since v1.9)
     if hasattr(dispatch, 'request'):
       return(dispatch.dispatch(dispatch.request(cmdline)))
